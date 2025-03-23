@@ -1,0 +1,24 @@
+[project]
+name = "termwave"
+version = "0.1.0"
+description = "Simple CLUI AI chat"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "linkify-it-py==2.0.3",
+    "markdown-it-py==3.0.0",
+    "mdit-py-plugins==0.4.2",
+    "mdurl==0.1.2",
+    "platformdirs==4.3.7",
+    "pygments==2.19.1",
+    "rich==13.9.4",
+    "textual==2.1.2",
+    "typing-extensions==4.12.2",
+    "uc-micro-py==1.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "ruff>=0.11.2",
+]
