@@ -1,16 +1,15 @@
+"""Functional tests for the chat UI."""
+
 import os
 import tempfile
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest_asyncio
-from textual.app import App
-from textual.widgets import Input, Markdown
-from textual.containers import Container
 
 # Import the main application
-from src.main import AIChatApp, ChatHistoryItem
+from src.app import AIChatApp
+from src.ui.components import ChatHistoryItem
 
 
 @pytest_asyncio.fixture
@@ -23,8 +22,13 @@ async def app():
     # Create the app with the test database
     async with AIChatApp().run_test() as pilot:
         # Override the database path and initialize it
-        pilot.app.db_path = db_path
-        pilot.app.init_database()
+        pilot.app.db.db_path = db_path
+        pilot.app.db.init_database()
+        
+        # Mock the chat provider to avoid external API calls
+        async def mock_generate_response(messages):
+            return "This is a test response from the mock provider."
+        pilot.app.chat_provider.generate_response = mock_generate_response
         
         yield pilot
         
@@ -54,8 +58,8 @@ async def test_app_initialization(app):
 @pytest.mark.asyncio
 async def test_sending_message(app):
     """Test sending a message."""
-    # Get the input widget
-    input_widget = app.app.query_one("#user-input")
+    # Verify input widget exists
+    assert app.app.query_one("#user-input") is not None
     
     # Send a test message
     await app.press(*"Hello, this is a test message")
@@ -114,7 +118,9 @@ async def test_chat_history_navigation(app):
     # Create a first chat with a message
     await app.press(*"Message in first chat")
     await app.press("enter")
+    # Store the current chat ID for comparison later
     first_chat_id = app.app.current_chat_id
+    assert first_chat_id is not None
     
     # Create a second chat
     await app.press(*"/new")
@@ -123,7 +129,10 @@ async def test_chat_history_navigation(app):
     # Add a message to the second chat
     await app.press(*"Message in second chat")
     await app.press("enter")
+    # Verify we have a new chat ID different from the first one
     second_chat_id = app.app.current_chat_id
+    assert second_chat_id is not None
+    assert second_chat_id != first_chat_id, "Expected a different chat ID for the second chat"
     
     # Check that we can find chat history items
     history_items = app.app.query(ChatHistoryItem)

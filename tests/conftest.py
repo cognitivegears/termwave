@@ -1,11 +1,17 @@
+"""Test fixtures for TermWave."""
+
 import pytest
 import os
+import sys
 import tempfile
 from pathlib import Path
-import sqlite3
+
+# Add the project root to the path so imports work during testing
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import the application
-from src.main import AIChatApp
+from src.app import AIChatApp
+from src.db.database import ChatDatabase
 
 
 @pytest.fixture
@@ -26,10 +32,10 @@ def test_app(monkeypatch, temp_db_path):
     # Create an app instance
     app = AIChatApp()
     
-    # Override the database path
-    monkeypatch.setattr(app, "db_path", temp_db_path)
+    # Create a test database
+    db = ChatDatabase(db_path=temp_db_path)
     
-    # Initialize the database
-    app.init_database()
+    # Override the app's database
+    monkeypatch.setattr(app, "db", db)
     
     return app

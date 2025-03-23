@@ -1,8 +1,9 @@
-import pytest
+"""Tests for the ChatHistoryItem UI component."""
+
 from textual.widgets import Button, Static
 
 # Import the ChatHistoryItem class
-from src.main import ChatHistoryItem
+from src.ui.components import ChatHistoryItem
 
 
 class TestChatHistoryItem:

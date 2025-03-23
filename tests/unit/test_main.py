@@ -1,7 +1,9 @@
-import pytest
+"""Tests for the main module."""
+
 from unittest.mock import patch
 
-from src.main import AIChatApp, main, _run_if_main, _test_for_coverage, IS_MAIN
+from src.main import main, _run_if_main, _test_for_coverage, IS_MAIN
+from src.app import AIChatApp
 
 
 class TestMain:

@@ -1,12 +1,13 @@
+"""Tests for database functionality."""
+
 import os
 import sqlite3
 import tempfile
 import pytest
 from pathlib import Path
-from unittest.mock import Mock
 
-# Import the main application to access its methods
-from src.main import AIChatApp
+# Import the database module
+from src.db.database import ChatDatabase
 
 
 class TestDatabase:
@@ -24,37 +25,11 @@ class TestDatabase:
         os.rmdir(temp_dir)
 
     @pytest.fixture
-    def mock_app(self, monkeypatch, temp_db_path):
-        """Create a mock app with a test database."""
-        # Create an app instance
-        app = AIChatApp()
-        
-        # Override the database path
-        monkeypatch.setattr(app, "db_path", temp_db_path)
-        
-        # Initialize the database
-        app.init_database()
-        
-        # Mock the query_one method to avoid UI interactions
-        def mock_query_one(selector):
-            mock_widget = Mock()
-            if selector == "#history-list":
-                mock_widget.clear = Mock()
-                mock_widget.append = Mock()
-            elif selector == "#chat-container":
-                mock_widget.remove_children = Mock()
-                mock_widget.mount = Mock()
-                mock_widget.scroll_end = Mock()
-            elif selector == "#user-input":
-                mock_widget.focus = Mock()
-                mock_widget.value = ""
-            return mock_widget
-            
-        monkeypatch.setattr(app, "query_one", mock_query_one)
-        
-        return app
+    def db(self, temp_db_path):
+        """Create a database instance with a test database."""
+        return ChatDatabase(db_path=temp_db_path)
 
-    def test_init_database(self, mock_app, temp_db_path):
+    def test_init_database(self, db, temp_db_path):
         """Test that database initialization creates the expected tables."""
         # Connect to the database
         conn = sqlite3.connect(temp_db_path)
@@ -87,12 +62,12 @@ class TestDatabase:
         
         conn.close()
 
-    def test_create_new_chat(self, mock_app):
+    def test_create_new_chat(self, db):
         """Test creating a new chat."""
-        chat_id = mock_app.create_new_chat("Test Chat")
+        chat_id = db.create_new_chat("Test Chat")
         
         # Check if chat was created
-        conn = sqlite3.connect(mock_app.db_path)
+        conn = sqlite3.connect(db.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT title FROM chats WHERE id = ?", (chat_id,))
         result = cursor.fetchone()
@@ -100,25 +75,41 @@ class TestDatabase:
         
         assert result is not None, "Chat not created in database"
         assert result[0] == "Test Chat", "Chat title does not match"
-        assert mock_app.current_chat_id == chat_id, "Current chat ID not updated"
 
-    def test_save_and_load_messages(self, mock_app):
-        """Test saving and loading messages."""
+    def test_get_all_chats(self, db):
+        """Test getting all chats."""
+        # Create some test chats
+        chat_id1 = db.create_new_chat("Test Chat 1")
+        chat_id2 = db.create_new_chat("Test Chat 2")
+        
+        # Get all chats
+        chats = db.get_all_chats()
+        
+        # Should have at least 2 chats
+        assert len(chats) >= 2
+        
+        # Find our test chats in the results
+        chat1 = next((c for c in chats if c[0] == chat_id1), None)
+        chat2 = next((c for c in chats if c[0] == chat_id2), None)
+        
+        assert chat1 is not None, "Chat 1 not found in get_all_chats result"
+        assert chat2 is not None, "Chat 2 not found in get_all_chats result"
+        assert chat1[1] == "Test Chat 1"
+        assert chat2[1] == "Test Chat 2"
+
+    def test_save_and_get_messages(self, db):
+        """Test saving and retrieving messages."""
         # Create a chat
-        chat_id = mock_app.create_new_chat("Test Chat")
+        chat_id = db.create_new_chat("Test Chat")
         
         # Save a user message
-        mock_app.save_message("user", "Hello, this is a test message")
+        db.save_message(chat_id, "user", "Hello, this is a test message")
         
         # Save an AI response
-        mock_app.save_message("assistant", "This is a test response")
+        db.save_message(chat_id, "assistant", "This is a test response")
         
-        # Connect to the database and check messages
-        conn = sqlite3.connect(mock_app.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT role, content FROM messages WHERE chat_id = ?", (chat_id,))
-        messages = cursor.fetchall()
-        conn.close()
+        # Get messages
+        messages = db.get_chat_messages(chat_id)
         
         assert len(messages) == 2, "Expected 2 messages"
         assert messages[0][0] == "user", "First message should be from user"
@@ -126,38 +117,20 @@ class TestDatabase:
         assert messages[1][0] == "assistant", "Second message should be from assistant"
         assert messages[1][1] == "This is a test response", "Assistant message content doesn't match"
 
-    def test_delete_chat(self, mock_app):
+    def test_delete_chat(self, db):
         """Test deleting a chat."""
-        # Instead of testing the full flow with a live database which is causing issues with mocking,
-        # let's create a direct connection to test just the delete_chat functionality
+        # Create a chat
+        chat_id = db.create_new_chat("Test Chat to Delete")
         
-        # Get path to the test database
-        db_path = mock_app.db_path
+        # Add some messages
+        db.save_message(chat_id, "user", "Message to be deleted")
+        db.save_message(chat_id, "assistant", "Response to be deleted")
         
-        # Create a connection and manually create test data
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Insert a test chat
-        cursor.execute("INSERT INTO chats (id, title) VALUES (999, 'Test Chat to Delete')")
-        chat_id = 999
-        
-        # Insert test messages
-        cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, 'user', 'Message to be deleted')", (chat_id,))
-        cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, 'assistant', 'Response to be deleted')", (chat_id,))
-        conn.commit()
-        
-        # Close and reopen connection to ensure data is written
-        conn.close()
-        
-        # Set the current chat ID in the app
-        mock_app.current_chat_id = chat_id + 1  # Different from the one we'll delete
-        
-        # Now delete the chat
-        mock_app.delete_chat(chat_id)
+        # Delete the chat
+        db.delete_chat(chat_id)
         
         # Check if chat was deleted
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(db.db_path)
         cursor = conn.cursor()
         
         # Check chat
@@ -173,82 +146,51 @@ class TestDatabase:
         assert chat_result is None, "Chat was not deleted"
         assert len(message_result) == 0, "Messages were not deleted"
 
-    def test_chat_title_update(self, mock_app):
+    def test_chat_title_update(self, db):
         """Test that the chat title is updated based on the first message."""
         # Create a chat
-        chat_id = mock_app.create_new_chat("Initial Title")
+        chat_id = db.create_new_chat("Initial Title")
         
         # Save a user message with enough words to update the title
         test_message = "First second third fourth fifth sixth"
-        mock_app.save_message("user", test_message)
+        db.save_message(chat_id, "user", test_message)
         
-        # Connect to the database and check the title
-        conn = sqlite3.connect(mock_app.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT title FROM chats WHERE id = ?", (chat_id,))
-        title = cursor.fetchone()[0]
-        conn.close()
+        # Get chat info
+        chat_info = db.get_chat_info(chat_id)
+        title = chat_info[0]
         
         expected_title = "First second third fourth fifth..."
         assert title == expected_title, f"Title not updated correctly. Expected '{expected_title}', got '{title}'"
         
         # Save another user message, which should not update the title
-        mock_app.save_message("user", "This should not change the title")
+        db.save_message(chat_id, "user", "This should not change the title")
         
-        # Connect again and check the title hasn't changed
-        conn = sqlite3.connect(mock_app.db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT title FROM chats WHERE id = ?", (chat_id,))
-        title_after_second_message = cursor.fetchone()[0]
-        conn.close()
+        # Get chat info again
+        chat_info = db.get_chat_info(chat_id)
+        title_after_second_message = chat_info[0]
         
         assert title_after_second_message == expected_title, "Title should not have changed after the second message"
 
-    def test_load_chat_nonexistent(self, mock_app):
-        """Test loading a non-existent chat."""
-        # Try to load a chat with an ID that doesn't exist
+    def test_get_chat_info_nonexistent(self, db):
+        """Test getting info for a non-existent chat."""
+        # Try to get info for a chat with an ID that doesn't exist
         nonexistent_id = 9999
-        mock_app.load_chat(nonexistent_id)
+        chat_info = db.get_chat_info(nonexistent_id)
         
-        # Since the chat doesn't exist, load_chat should return early
-        # We can't directly test the return value, but we can check that current_chat_id didn't change
-        assert mock_app.current_chat_id != nonexistent_id
-    
-    def test_save_message_no_current_chat(self, mock_app):
-        """Test saving a message when no chat is selected."""
-        # Set current_chat_id to None
-        mock_app.current_chat_id = None
+        assert chat_info is None, "Expected None for non-existent chat"
+
+    def test_save_message_no_chat_id(self, db):
+        """Test saving a message with no chat ID."""
+        # Try to save a message with None as chat_id
+        result = db.save_message(None, "user", "This message shouldn't be saved")
         
-        # Try to save a message
-        mock_app.save_message("user", "This message shouldn't be saved")
+        assert result is False, "Expected False when saving message with no chat_id"
         
-        # Connect to the database and check no messages were saved
-        conn = sqlite3.connect(mock_app.db_path)
+        # Check that no messages were saved
+        conn = sqlite3.connect(db.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM messages")
         count = cursor.fetchone()[0]
         conn.close()
         
-        assert count == 0, "Message was saved despite having no current chat"
-    
-    def test_delete_current_chat(self, mock_app):
-        """Test deleting the current chat."""
-        # Our current mocking approach won't accurately test this behavior
-        # without more complex setup. Let's directly test the relevant code path:
-        
-        # Set a specific chat ID
-        original_chat_id = 1234
-        mock_app.current_chat_id = original_chat_id
-        
-        # Mock create_new_chat to return a different ID
-        original_create_new_chat = mock_app.create_new_chat
-        mock_app.create_new_chat = Mock(return_value=original_chat_id + 1)
-        
-        # Call delete_chat
-        mock_app.delete_chat(original_chat_id)
-        
-        # Verify create_new_chat was called
-        mock_app.create_new_chat.assert_called_once()
-        
-        # Restore original method
-        mock_app.create_new_chat = original_create_new_chat
+        assert count == 0, "Message was saved despite having no chat_id"

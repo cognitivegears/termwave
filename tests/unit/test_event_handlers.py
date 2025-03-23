@@ -1,7 +1,10 @@
+"""Tests for various event handlers."""
+
 import pytest
 from unittest.mock import Mock, MagicMock
 
-from src.main import AIChatApp, ChatHistoryItem, Button
+from src.app import AIChatApp
+from src.ui.components import ChatHistoryItem
 
 
 class TestEventHandlers:
@@ -9,27 +12,25 @@ class TestEventHandlers:
 
     @pytest.fixture
     def mock_app(self):
-        """Create a mock app with mocked database functionality."""
+        """Create a mock app for testing event handlers."""
         app = AIChatApp()
-        # Mock database-related methods
-        app.init_database = Mock()
-        app.load_chat_history = Mock()
-        app.create_new_chat = Mock(return_value=1)
+        # Mock database and config-related methods
+        app.db = Mock()
+        app.config = Mock()
+        app.command_handler = Mock()
+        app.chat_provider = Mock()
+        
+        # Mock methods that would be called by event handlers
         app.load_chat = Mock()
         app.delete_chat = Mock()
-        app.current_chat_id = 1
+        app.add_message_to_chat = Mock()
+        app.save_and_respond_to_message = Mock()
+        app.load_chat_history = Mock()
         
         # Mock UI elements
         def mock_query_one(selector):
             mock_widget = Mock()
-            if selector == "#history-list":
-                mock_widget.clear = Mock()
-                mock_widget.append = Mock()
-            elif selector == "#chat-container":
-                mock_widget.remove_children = Mock()
-                mock_widget.mount = Mock()
-                mock_widget.scroll_end = Mock()
-            elif selector == "#user-input":
+            if selector == "#user-input":
                 mock_widget.focus = Mock()
                 mock_widget.value = ""
             return mock_widget
@@ -123,3 +124,42 @@ class TestEventHandlers:
         
         # Check that load_chat was not called
         mock_app.load_chat.assert_not_called()
+        
+    @pytest.mark.asyncio
+    async def test_on_input_submitted_command(self, mock_app):
+        """Test handling of input submission with a command."""
+        # Create a mock event
+        event = MagicMock()
+        event.value = "/help"
+        
+        # Call the event handler
+        await mock_app.on_input_submitted(event)
+        
+        # Check that handle_command was called
+        mock_app.command_handler.handle_command.assert_called_once_with("/help")
+        
+        # Check that save_and_respond_to_message was not called
+        mock_app.save_and_respond_to_message.assert_not_called()
+    
+    @pytest.mark.asyncio
+    async def test_on_input_submitted_message(self, mock_app):
+        """Test handling of input submission with a regular message."""
+        # Set up mock async response
+        async def mock_save_and_respond():
+            return "Test response"
+        mock_app.save_and_respond_to_message = Mock(return_value=mock_save_and_respond())
+        
+        # Create a mock event
+        event = MagicMock()
+        event.value = "Test message"
+        
+        # Call the event handler
+        await mock_app.on_input_submitted(event)
+        
+        # Check that save_and_respond_to_message was called
+        mock_app.save_and_respond_to_message.assert_called_once_with("Test message")
+        
+        # Check that add_message_to_chat was called for both user and assistant messages
+        assert mock_app.add_message_to_chat.call_count == 2
+        mock_app.add_message_to_chat.assert_any_call("Test message", role="user")
+        mock_app.add_message_to_chat.assert_any_call("Test response", role="assistant")
