@@ -107,5 +107,15 @@ class CommandHandler:
             else:
                 self.app.add_message_to_chat(f"Unknown option: `{option}`.")
         else:
-            # Switching provider - this would be implemented in the app
-            self.app.add_message_to_chat("Provider switching not yet implemented.")
+            # Switching provider
+            provider_name = args.strip().lower()
+            if provider_name in ["openai", "anthropic", "mock"]:
+                try:
+                    self.app.setup_provider(provider_name)
+                    self.app.add_message_to_chat(f"Switched to the **{self.app.chat_provider.name}** provider.")
+                except Exception as e:
+                    self.app.add_message_to_chat(f"Error switching provider: {str(e)}")
+            else:
+                self.app.add_message_to_chat(
+                    "Invalid provider name. Available providers: `openai`, `anthropic`, `mock`."
+                )

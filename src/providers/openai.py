@@ -1,5 +1,10 @@
 """OpenAI chat provider implementation."""
 
+import os
+from typing import List, Dict, Any
+
+from openai import AsyncOpenAI
+
 from .base import ChatProvider
 
 
@@ -17,14 +22,15 @@ class OpenAIProvider(ChatProvider):
         Args:
             api_key: API key for OpenAI. If None, will try to use environment variable.
         """
-        self.api_key = api_key
+        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
+        self.client = AsyncOpenAI(api_key=self.api_key)
         self.options = {
             "model": "gpt-3.5-turbo",
             "temperature": 0.7,
             "max_tokens": 1000,
         }
     
-    async def generate_response(self, messages):
+    async def generate_response(self, messages: List[Dict[str, str]]) -> str:
         """Generate a response using OpenAI's API.
         
         Args:
@@ -33,15 +39,28 @@ class OpenAIProvider(ChatProvider):
         Returns:
             str: The assistant's response
         """
-        import asyncio
+        if not self.api_key:
+            return "Error: OpenAI API key not found. Please set the OPENAI_API_KEY environment variable."
         
-        # Simulate a small delay to mimic network latency
-        await asyncio.sleep(0.5)
-        
-        # TODO: Implement OpenAI API integration
-        return "OpenAI integration not yet implemented. This is a placeholder."
+        try:
+            # Convert messages to format expected by OpenAI API
+            api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+            
+            # Call OpenAI API
+            response = await self.client.chat.completions.create(
+                model=self.options["model"],
+                messages=api_messages,
+                temperature=self.options["temperature"],
+                max_tokens=self.options["max_tokens"],
+            )
+            
+            # Extract response text
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            return f"Error generating response from OpenAI: {str(e)}"
     
-    def get_provider_options(self):
+    def get_provider_options(self) -> Dict[str, Any]:
         """Get provider-specific options.
         
         Returns:
@@ -49,7 +68,7 @@ class OpenAIProvider(ChatProvider):
         """
         return self.options
     
-    def set_provider_option(self, option_name, option_value):
+    def set_provider_option(self, option_name: str, option_value: Any) -> bool:
         """Set a provider-specific option.
         
         Args:

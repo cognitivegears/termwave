@@ -11,8 +11,8 @@ termwave (termwave.chat) is an AI chat application using the textual library to 
 - [x] View an existing chat
 - [ ] Multi-line input
 - [x] Markdown and rich text rendering
-- [ ] Choose a model
-- [ ] Implement OpenAI API for chat
+- [x] Choose a model
+- [x] Implement OpenAI API for chat
 - [ ] Plugin setup to add additional API's for chat
 - [ ] Implement MCP support
 - [ ] Implement a command line interface
