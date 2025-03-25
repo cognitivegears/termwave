@@ -9,7 +9,8 @@ class CommandHandler:
         "/quit": "Exit the application",
         "/help": "Show available commands",
         "/new": "Start a new chat session",
-        "/provider": "Switch or configure the chat provider"
+        "/provider": "Switch or configure the chat provider",
+        "/providers": "List all available chat providers"
     }
     
     def __init__(self, app):
@@ -48,6 +49,10 @@ class CommandHandler:
         elif cmd == "/provider":
             self._handle_provider_command(args)
             return True
+            
+        elif cmd == "/providers":
+            self._list_providers()
+            return True
         
         else:
             self._show_unknown_command(command)
@@ -67,6 +72,27 @@ class CommandHandler:
             f"Unknown command: `{command}`\nType `/help` to see available commands."
         )
     
+    def _list_providers(self):
+        """List all available providers."""
+        available_providers = list(self.app.PROVIDER_CLASSES.keys())
+        current_provider = None
+        
+        for name, cls in self.app.PROVIDER_CLASSES.items():
+            if isinstance(self.app.chat_provider, cls):
+                current_provider = name
+                break
+        
+        message = "## Available Chat Providers\n\n"
+        
+        for provider in available_providers:
+            if provider == current_provider:
+                message += f"- **`{provider}`** (current)\n"
+            else:
+                message += f"- `{provider}`\n"
+                
+        message += "\nUse `/provider [name]` to switch providers or `/provider` to see current provider options."
+        self.app.add_message_to_chat(message)
+    
     def _handle_provider_command(self, args):
         """Handle provider-related commands."""
         if not args:
@@ -81,6 +107,7 @@ class CommandHandler:
                 message += f"- `{option}`: {value}\n"
             
             message += "\nUse `/provider [name]` to switch providers or `/provider option=value` to set options."
+            message += "\nUse `/providers` to see all available providers."
             self.app.add_message_to_chat(message)
             return
         
@@ -109,13 +136,16 @@ class CommandHandler:
         else:
             # Switching provider
             provider_name = args.strip().lower()
-            if provider_name in ["openai", "anthropic", "mock"]:
+            available_providers = list(self.app.PROVIDER_CLASSES.keys())
+            
+            if provider_name in available_providers:
                 try:
                     self.app.setup_provider(provider_name)
                     self.app.add_message_to_chat(f"Switched to the **{self.app.chat_provider.name}** provider.")
                 except Exception as e:
                     self.app.add_message_to_chat(f"Error switching provider: {str(e)}")
             else:
+                provider_list = ", ".join([f"`{p}`" for p in available_providers])
                 self.app.add_message_to_chat(
-                    "Invalid provider name. Available providers: `openai`, `anthropic`, `mock`."
+                    f"Invalid provider name. Available providers: {provider_list}."
                 )

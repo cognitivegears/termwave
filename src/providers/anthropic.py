@@ -5,15 +5,15 @@ from .base import ChatProvider
 
 class AnthropicProvider(ChatProvider):
     """Chat provider using Anthropic's API."""
-    
+
     @property
     def name(self):
         """Return the name of the provider."""
         return "Anthropic"
-    
+
     def __init__(self, api_key=None):
         """Initialize the Anthropic provider.
-        
+
         Args:
             api_key: API key for Anthropic. If None, will try to use environment variable.
         """
@@ -23,39 +23,47 @@ class AnthropicProvider(ChatProvider):
             "temperature": 0.7,
             "max_tokens": 1000,
         }
-    
+
+    def get_provider_model_list(self):
+        """Get a list of available models for the provider.
+
+        Returns:
+            list: A list of available model names
+        """
+        return ["claude-3-7-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-5-sonnet-latest", "claude-3-opus-latest", "claude-3-haiku-20240307"]
+
     async def generate_response(self, messages):
         """Generate a response using Anthropic's API.
-        
+
         Args:
             messages: List of message objects with 'role' and 'content'
-            
+
         Returns:
             str: The assistant's response
         """
         import asyncio
-        
+
         # Simulate a small delay to mimic network latency
         await asyncio.sleep(0.5)
-        
+
         # TODO: Implement Anthropic API integration
         return "Anthropic integration not yet implemented. This is a placeholder."
-    
+
     def get_provider_options(self):
         """Get provider-specific options.
-        
+
         Returns:
             dict: A dictionary of available options and their current values
         """
         return self.options
-    
+
     def set_provider_option(self, option_name, option_value):
         """Set a provider-specific option.
-        
+
         Args:
             option_name: The name of the option to set
             option_value: The value to set for the option
-            
+
         Returns:
             bool: True if the option was set successfully
         """

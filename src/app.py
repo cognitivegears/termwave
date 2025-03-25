@@ -14,6 +14,7 @@ from src.config import Config
 from src.providers.mock import MockProvider
 from src.providers.openai import OpenAIProvider
 from src.providers.anthropic import AnthropicProvider
+from src.providers.eliza import ElizaProvider
 
 
 class AIChatApp(App):
@@ -21,6 +22,14 @@ class AIChatApp(App):
 
     CSS = APP_CSS
     current_chat_id = reactive(None)
+    
+    # Define a mapping of provider names to their classes
+    PROVIDER_CLASSES = {
+        "mock": MockProvider,
+        "openai": OpenAIProvider,
+        "anthropic": AnthropicProvider,
+        "eliza": ElizaProvider
+    }
 
     def __init__(self):
         """Initialize the application."""
@@ -39,15 +48,20 @@ class AIChatApp(App):
         Args:
             provider_name: The name of the provider to use
         """
-        if provider_name == "openai":
-            api_key = self.config.get("providers.openai.api_key")
-            self.chat_provider = OpenAIProvider(api_key=api_key)
-        elif provider_name == "anthropic":
-            api_key = self.config.get("providers.anthropic.api_key")
-            self.chat_provider = AnthropicProvider(api_key=api_key)
+        # Check if the provider exists in our mapping
+        if provider_name not in self.PROVIDER_CLASSES:
+            # Default to mock provider if not found
+            provider_name = "mock"
+        
+        # Get the provider class
+        provider_class = self.PROVIDER_CLASSES[provider_name]
+        
+        # Initialize with API key if needed
+        if provider_name in ["openai", "anthropic"]:
+            api_key = self.config.get(f"providers.{provider_name}.api_key")
+            self.chat_provider = provider_class(api_key=api_key)
         else:
-            # Default to mock provider
-            self.chat_provider = MockProvider()
+            self.chat_provider = provider_class()
 
         # Load provider-specific options from config
         provider_config = self.config.get(f"providers.{provider_name}", {})

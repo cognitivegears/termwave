@@ -37,6 +37,10 @@ class Config:
                     "temperature": 0.7,
                     "max_tokens": 1000
                 },
+                "eliza": {
+                    "response_delay": 0.5,
+                    "model": "doctor"
+                },
                 "mock": {
                     "response_delay": 0.5,
                     "response_type": "normal"
